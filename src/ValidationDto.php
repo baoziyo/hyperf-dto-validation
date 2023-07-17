@@ -49,6 +49,8 @@ class ValidationDto
         if (empty($validArr)) {
             return;
         }
+        ksort($validArr['rule']);
+
         $validator = $this->validationFactory->make(
             $data,
             $validArr['rule'],
@@ -62,12 +64,13 @@ class ValidationDto
         $notSimplePropertyArr = PropertyManager::getPropertyAndNotSimpleType($className);
         foreach ($notSimplePropertyArr as $fieldName => $property) {
             if (!empty($data[$fieldName])) {
-                if ($property->isClassArray()) {
-                    foreach ($data[$fieldName] as $item) {
-                        $this->validateResolved($property->arrClassName, $item);
-                    }
-                } elseif ($property->className != null) {
-                    $this->validateResolved($property->className, $data[$fieldName]);
+//                if ($property->isClassArray()) {
+//                    foreach ($data[$fieldName] as $item) {
+//                        $this->validateResolved($property->arrClassName, $item);
+//                    }
+//                } elseif ($property->className != null) {
+                if ($property->className != null) {
+                    $this->validateResolved($property->className, $data);
                 }
             }
         }

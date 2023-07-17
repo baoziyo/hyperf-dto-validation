@@ -11,12 +11,14 @@ declare(strict_types=1);
 
 namespace Baoziyoo\Hyperf\DTO\Validation\Aspect;
 
+use Baoziyoo\Hyperf\ApiDocs\Annotation\ApiModelProperty;
 use Baoziyoo\Hyperf\DTO\Annotation\JSONField;
 use Baoziyoo\Hyperf\DTO\ApiAnnotation;
+use Baoziyoo\Hyperf\DTO\Scan\Property;
 use Baoziyoo\Hyperf\DTO\Scan\PropertyAliasMappingManager;
+use Baoziyoo\Hyperf\DTO\Scan\PropertyManager;
 use Baoziyoo\Hyperf\DTO\Validation\Annotation\Rule\BaseValidation;
 use Baoziyoo\Hyperf\DTO\Validation\Scan\ValidationManager;
-use Hyperf\ApiDocs\Annotation\ApiModelProperty;
 use Hyperf\Di\Aop\AbstractAspect;
 use Hyperf\Di\Aop\ProceedingJoinPoint;
 use Psr\Container\ContainerInterface;
@@ -61,8 +63,24 @@ class ScanAnnotationAspect extends AbstractAspect
     /**
      * 生成验证数据.
      */
-    protected function generateValidation(string $className, string $fieldName): void
+    protected function generateValidation(string $className, string $fieldName, array $prefix = [], string $topClassName = '', string $topFieldName = ''): void
     {
+        $property = PropertyManager::getProperty($className, $fieldName);
+        if ($property && $property->children !== []) {
+            if ($topClassName === '' || $topFieldName === '') {
+                $topClassName = $className;
+                $topFieldName = $fieldName;
+            }
+            if ($property->phpSimpleType === 'array') {
+                $prefix[] = ['field' => $fieldName, 'type' => '.*.'];
+            } else {
+                $prefix[] = ['field' => $fieldName, 'type' => '.'];
+            }
+            foreach ($property->children as $childrenFieldName => $childrenProperty) {
+                $this->generateValidation($childrenProperty->currentClassName, $childrenFieldName, $prefix, $topClassName, $topFieldName);
+            }
+            $prefix = [];
+        }
         $validationArr = [];
         $annotationArray = ApiAnnotation::getClassProperty($className, $fieldName);
 
@@ -71,7 +89,19 @@ class ScanAnnotationAspect extends AbstractAspect
                 $validationArr[] = $annotation;
             }
         }
+//        echo '<pre>';
+//        print_r($annotationArray);
+//        echo '</pre>';
+//        echo '<pre>';
+//        print_r(PropertyManager::getAll());
+//        echo '</pre>';
 
+//        echo '<pre>';
+//        print_r($validationArr);
+//        echo '</pre>';
+        if ($topClassName !== '') {
+            $className = $topClassName;
+        }
         $ruleArray = [];
         foreach ($validationArr as $validation) {
             if (!$validation instanceof BaseValidation || empty($validation->getRule())) {
@@ -88,6 +118,12 @@ class ScanAnnotationAspect extends AbstractAspect
         }
 
         if (!empty($ruleArray)) {
+            $newPrefix = '';
+            foreach ($prefix as $item) {
+                $newPrefix .= $item['field'] . $item['type'];
+            }
+            $fieldName = $newPrefix . $fieldName;
+
             ValidationManager::setRule($className, $fieldName, $ruleArray);
             foreach ($annotationArray as $annotation) {
                 if (class_exists(ApiModelProperty::class) && $annotation instanceof ApiModelProperty && !empty($annotation->value)) {
