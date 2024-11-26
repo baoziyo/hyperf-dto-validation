@@ -100,6 +100,10 @@ class CoreMiddlewareAspect extends AbstractAspect
             $param = $request->getQueryParams();
         } elseif ($methodParameter->isRequestFormData()) {
             $param = $request->getParsedBody();
+            // 兼容file
+            if (is_array($param) && count($request->getUploadedFiles()) > 0) {
+                $param = array_merge($param, $request->getUploadedFiles());
+            }
         } elseif ($methodParameter->isRequestHeader()) {
             $param = array_map(static function ($value) {
                 return $value[0];
